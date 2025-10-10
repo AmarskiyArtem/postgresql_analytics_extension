@@ -234,7 +234,7 @@ CREATE AGGREGATE stats_extension.mad(numeric) (
 CREATE OR REPLACE FUNCTION stats_extension._final_quartile1(
     arr numeric[]
 ) RETURNS numeric AS $$
-SELECT percentile_cont(0.25) WITHIN GROUP (ORDER BY val)
+SELECT percentile_cont(0.25) WITHIN GROUP (ORDER BY val)::numeric
 FROM unnest(arr) AS val;
 $$ LANGUAGE sql IMMUTABLE;
 
@@ -248,7 +248,7 @@ CREATE AGGREGATE stats_extension.quartile1(numeric) (
 CREATE OR REPLACE FUNCTION stats_extension._final_quartile3(
     arr numeric[]
 ) RETURNS numeric AS $$
-SELECT percentile_cont(0.75) WITHIN GROUP (ORDER BY val)
+SELECT percentile_cont(0.75) WITHIN GROUP (ORDER BY val)::numeric
 FROM unnest(arr) AS val;
 $$ LANGUAGE sql IMMUTABLE;
 
