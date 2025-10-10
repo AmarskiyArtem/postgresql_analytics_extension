@@ -27,12 +27,15 @@ CREATE OR REPLACE FUNCTION stats_extension.trimmed_mean_state(
     frac  numeric
 ) RETURNS stats_extension_trim_state AS $$
 BEGIN
+    IF state IS NULL THEN
+        state := (ARRAY[]::numeric[], NULL)::stats_extension_trim_state;
+    END IF;
     IF state.values IS NULL THEN
         state.values := ARRAY[]::numeric[];
     END IF;
-    -- append the incoming value to the values array
-    state.values := array_append(state.values, val);
-    -- remember the trim fraction if supplied (assumes constant across rows)
+    IF val IS NOT NULL THEN
+        state.values := array_append(state.values, val);
+    END IF;
     IF frac IS NOT NULL THEN
         state.fraction := frac;
     END IF;
@@ -455,5 +458,5 @@ CREATE AGGREGATE stats_extension.trimmed_mean(numeric, numeric) (
     SFUNC    = stats_extension.trimmed_mean_state,
     STYPE    = stats_extension_trim_state,
     FINALFUNC = stats_extension.trimmed_mean_final,
-    INITCOND = '(NULL,0)'
+    INITCOND = '({},)'
 );
