@@ -1,0 +1,3 @@
+comment = 'Statistical aggregate functions extension providing median, mode, trimmed mean, quartile and other analytic aggregates'
+default_version = '1.0'
+relocatable = true
