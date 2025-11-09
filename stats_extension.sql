@@ -8,16 +8,17 @@ DECLARE
     s double precision := 0;
     v double precision;
 BEGIN
-    n := COALESCE(array_length(vals, 1), 0);
+    SELECT count(val), avg(val), stddev_pop(val)
+      INTO n, mean_value, sd
+      FROM unnest(vals) AS val
+      WHERE val IS NOT NULL;
     IF n = 0 THEN
         RETURN NULL;
     END IF;
-    SELECT avg(val), stddev_pop(val) INTO mean_value, sd
-      FROM unnest(vals) AS val;
     IF sd IS NULL OR sd = 0 THEN
         RETURN 0;
     END IF;
-    FOR v IN SELECT val FROM unnest(vals) AS val LOOP
+    FOR v IN SELECT val FROM unnest(vals) AS val WHERE val IS NOT NULL LOOP
         s := s + power((v - mean_value) / sd, 3);
     END LOOP;
     RETURN s / n;
@@ -34,16 +35,17 @@ DECLARE
     s double precision := 0;
     v double precision;
 BEGIN
-    n := COALESCE(array_length(vals, 1), 0);
+    SELECT count(val), avg(val), stddev_samp(val)
+      INTO n, mean_value, sd
+      FROM unnest(vals) AS val
+      WHERE val IS NOT NULL;
     IF n < 3 THEN
         RETURN NULL;
     END IF;
-    SELECT avg(val), stddev_samp(val) INTO mean_value, sd
-      FROM unnest(vals) AS val;
     IF sd IS NULL OR sd = 0 THEN
         RETURN 0;
     END IF;
-    FOR v IN SELECT val FROM unnest(vals) AS val LOOP
+    FOR v IN SELECT val FROM unnest(vals) AS val WHERE val IS NOT NULL LOOP
         s := s + power((v - mean_value) / sd, 3);
     END LOOP;
     RETURN (n::double precision / ((n - 1) * (n - 2))) * s;
@@ -61,16 +63,17 @@ DECLARE
     m4 double precision := 0;
     v double precision;
 BEGIN
-    n := COALESCE(array_length(vals, 1), 0);
+    SELECT count(val), avg(val), stddev_pop(val)
+      INTO n, mean_value, sd
+      FROM unnest(vals) AS val
+      WHERE val IS NOT NULL;
     IF n = 0 THEN
         RETURN NULL;
     END IF;
-    SELECT avg(val), stddev_pop(val) INTO mean_value, sd
-      FROM unnest(vals) AS val;
     IF sd IS NULL OR sd = 0 THEN
         RETURN 0;
     END IF;
-    FOR v IN SELECT val FROM unnest(vals) AS val LOOP
+    FOR v IN SELECT val FROM unnest(vals) AS val WHERE val IS NOT NULL LOOP
         m4 := m4 + power((v - mean_value) / sd, 4);
     END LOOP;
     RETURN m4 / n - 3;
@@ -89,16 +92,17 @@ DECLARE
     v double precision;
     factor double precision;
 BEGIN
-    n := COALESCE(array_length(vals, 1), 0);
+    SELECT count(val), avg(val), stddev_samp(val)
+      INTO n, mean_value, sd
+      FROM unnest(vals) AS val
+      WHERE val IS NOT NULL;
     IF n < 4 THEN
         RETURN NULL;
     END IF;
-    SELECT avg(val), stddev_samp(val) INTO mean_value, sd
-      FROM unnest(vals) AS val;
     IF sd IS NULL OR sd = 0 THEN
         RETURN 0;
     END IF;
-    FOR v IN SELECT val FROM unnest(vals) AS val LOOP
+    FOR v IN SELECT val FROM unnest(vals) AS val WHERE val IS NOT NULL LOOP
         m4 := m4 + power((v - mean_value) / sd, 4);
     END LOOP;
     factor := ((n * (n + 1))::double precision / ((n - 1) * (n - 2) * (n - 3)));
@@ -141,7 +145,8 @@ RETURNS anyelement AS
 $$
 BEGIN
     RETURN (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY v)
-            FROM unnest(values) AS v);
+            FROM unnest(values) AS v
+            WHERE v IS NOT NULL);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
@@ -164,10 +169,14 @@ BEGIN
     FROM (
         SELECT v AS val, count(*) AS cnt
         FROM unnest(values) AS v
+        WHERE v IS NOT NULL
         GROUP BY v
         ORDER BY cnt DESC, val
         LIMIT 1
     ) AS sub;
+    IF rec IS NULL THEN
+        RETURN NULL;
+    END IF;
     RETURN rec.val;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
@@ -188,12 +197,15 @@ DECLARE
     entropy double precision := 0;
     rec record;
 BEGIN
-    total := COALESCE(array_length(values, 1), 0);
+    SELECT count(*) INTO total
+      FROM unnest(values) AS v
+      WHERE v IS NOT NULL;
     IF total = 0 THEN
         RETURN NULL;
     END IF;
     FOR rec IN SELECT v AS val, count(*)::double precision AS cnt
                FROM unnest(values) AS v
+               WHERE v IS NOT NULL
                GROUP BY v LOOP
         entropy := entropy - (rec.cnt/total) * ln(rec.cnt/total);
     END LOOP;
@@ -213,7 +225,10 @@ CREATE OR REPLACE FUNCTION avg_weighted_trans(state double precision[], value do
 RETURNS double precision[] AS
 $$
 BEGIN
-    IF weight IS NOT NULL THEN
+    IF state IS NULL OR array_length(state, 1) < 2 THEN
+        state := ARRAY[0::double precision, 0::double precision];
+    END IF;
+    IF weight IS NOT NULL AND value IS NOT NULL THEN
         state[1] := state[1] + (value * weight);
         state[2] := state[2] + weight;
     END IF;
@@ -225,7 +240,7 @@ CREATE OR REPLACE FUNCTION avg_weighted_final(state double precision[])
 RETURNS double precision AS
 $$
 BEGIN
-    IF state[2] IS NULL OR state[2] = 0 THEN
+    IF state IS NULL OR state[2] IS NULL OR state[2] = 0 THEN
         RETURN NULL;
     END IF;
     RETURN state[1] / state[2];
@@ -244,7 +259,10 @@ CREATE OR REPLACE FUNCTION avg_if_trans(state double precision[], value double p
 RETURNS double precision[] AS
 $$
 BEGIN
-    IF cond THEN
+    IF state IS NULL OR array_length(state, 1) < 2 THEN
+        state := ARRAY[0::double precision, 0::double precision];
+    END IF;
+    IF cond IS TRUE AND value IS NOT NULL THEN
         state[1] := state[1] + value;
         state[2] := state[2] + 1;
     END IF;
@@ -256,7 +274,7 @@ CREATE OR REPLACE FUNCTION avg_if_final(state double precision[])
 RETURNS double precision AS
 $$
 BEGIN
-    IF state[2] IS NULL OR state[2] = 0 THEN
+    IF state IS NULL OR state[2] IS NULL OR state[2] = 0 THEN
         RETURN NULL;
     END IF;
     RETURN state[1] / state[2];
@@ -271,62 +289,107 @@ CREATE OR REPLACE AGGREGATE avg_if(value double precision, cond boolean) (
 );
 
 
-CREATE OR REPLACE FUNCTION contingency_final(vals1 anyarray, vals2 anyarray)
+CREATE OR REPLACE FUNCTION contingency_trans(state jsonb, val1 anyelement, val2 anyelement)
+RETURNS jsonb AS
+$$
+DECLARE
+    total integer;
+    rows jsonb;
+    cols jsonb;
+    cells jsonb;
+    r text;
+    c text;
+BEGIN
+    IF state IS NULL THEN
+        state := '{"total":0,"rows":{},"cols":{},"cells":{}}'::jsonb;
+    END IF;
+
+    IF val1 IS NULL OR val2 IS NULL THEN
+        RETURN state;
+    END IF;
+
+    rows := COALESCE(state->'rows', '{}'::jsonb);
+    cols := COALESCE(state->'cols', '{}'::jsonb);
+    cells := COALESCE(state->'cells', '{}'::jsonb);
+    total := COALESCE((state->>'total')::integer, 0) + 1;
+
+    r := val1::text;
+    c := val2::text;
+
+    rows := rows || jsonb_build_object(r, COALESCE((rows->>r)::integer, 0) + 1);
+    cols := cols || jsonb_build_object(c, COALESCE((cols->>c)::integer, 0) + 1);
+    cells := cells || jsonb_build_object(r || '|' || c, COALESCE((cells->>(r || '|' || c))::integer, 0) + 1);
+
+    RETURN jsonb_build_object(
+        'total', total,
+        'rows', rows,
+        'cols', cols,
+        'cells', cells
+    );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+CREATE OR REPLACE FUNCTION contingency_final(state jsonb)
 RETURNS double precision AS
 $$
 DECLARE
-    n integer;
-    chi2 double precision := 0;
-    rows integer;
-    cols integer;
     total double precision;
-    r_counts jsonb;
-    c_counts jsonb;
-    rc_counts jsonb;
-    r text;
-    c text;
+    rows jsonb;
+    cols jsonb;
+    cells jsonb;
+    row_rec record;
+    col_rec record;
+    chi2 double precision := 0;
+    row_count integer;
+    col_count integer;
+    denom double precision;
     observed double precision;
     expected double precision;
 BEGIN
-    n := COALESCE(array_length(vals1,1),0);
-    IF n = 0 OR array_length(vals2,1) != n THEN
+    IF state IS NULL THEN
         RETURN NULL;
     END IF;
 
-    r_counts := '{}'::jsonb;
-    c_counts := '{}'::jsonb;
-    rc_counts := '{}'::jsonb;
-    FOR i IN 1..n LOOP
-        r := vals1[i]::text;
-        c := vals2[i]::text;
-        r_counts := r_counts || jsonb_build_object(r, COALESCE((r_counts->>r)::integer,0) + 1);
-        c_counts := c_counts || jsonb_build_object(c, COALESCE((c_counts->>c)::integer,0) + 1);
-        rc_counts := rc_counts || jsonb_build_object(r||'|'||c, COALESCE((rc_counts->>(r||'|'||c))::integer,0) + 1);
-    END LOOP;
-    rows := jsonb_object_keys(r_counts)::integer;
-    cols := jsonb_object_keys(c_counts)::integer;
-    IF rows = 0 OR cols = 0 THEN
+    total := COALESCE((state->>'total')::double precision, 0);
+    IF total = 0 THEN
         RETURN NULL;
     END IF;
-    total := n;
-    FOR r_key IN SELECT key FROM jsonb_each_text(r_counts) LOOP
-        FOR c_key IN SELECT key FROM jsonb_each_text(c_counts) LOOP
-            observed := COALESCE((rc_counts->>(r_key.key || '|' || c_key.key))::double precision, 0);
-            expected := ((r_counts->>r_key.key)::double precision * (c_counts->>c_key.key)::double precision) / total;
+
+    rows := COALESCE(state->'rows', '{}'::jsonb);
+    cols := COALESCE(state->'cols', '{}'::jsonb);
+    cells := COALESCE(state->'cells', '{}'::jsonb);
+
+    SELECT count(*) INTO row_count FROM jsonb_object_keys(rows) AS row_keys(key);
+    SELECT count(*) INTO col_count FROM jsonb_object_keys(cols) AS col_keys(key);
+
+    IF row_count < 2 OR col_count < 2 THEN
+        RETURN 0;
+    END IF;
+
+    FOR row_rec IN SELECT key, value FROM jsonb_each_text(rows) AS r(key, value) LOOP
+        FOR col_rec IN SELECT key, value FROM jsonb_each_text(cols) AS c(key, value) LOOP
+            observed := COALESCE((cells->>(row_rec.key || '|' || col_rec.key))::double precision, 0);
+            expected := (row_rec.value::double precision * col_rec.value::double precision) / total;
             IF expected > 0 THEN
-                chi2 := chi2 + power(observed - expected,2) / expected;
+                chi2 := chi2 + power(observed - expected, 2) / expected;
             END IF;
         END LOOP;
     END LOOP;
 
-    RETURN sqrt(chi2 / (total * (least(rows-1, cols-1))));
+    denom := total * LEAST(row_count - 1, col_count - 1);
+    IF denom = 0 THEN
+        RETURN 0;
+    END IF;
+
+    RETURN sqrt(chi2 / denom);
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE OR REPLACE AGGREGATE contingency(val1 anyelement, val2 anyelement) (
-    STYPE      anyarray[],
-    SFUNC      array_append,
-    FINALFUNC  contingency_final
+    STYPE      jsonb,
+    SFUNC      contingency_trans,
+    FINALFUNC  contingency_final,
+    INITCOND   '{"total":0,"rows":{},"cols":{},"cells":{}}'::jsonb
 );
 
 
@@ -338,9 +401,13 @@ DECLARE
     sumlog double precision := 0;
     v double precision;
 BEGIN
-    n := COALESCE(array_length(values, 1), 0);
-    IF n = 0 THEN RETURN NULL; END IF;
-    FOR v IN SELECT val FROM unnest(values) AS val LOOP
+    SELECT count(val) INTO n
+      FROM unnest(values) AS val
+      WHERE val IS NOT NULL;
+    IF n = 0 THEN
+        RETURN NULL;
+    END IF;
+    FOR v IN SELECT val FROM unnest(values) AS val WHERE val IS NOT NULL LOOP
         IF v <= 0 THEN
             RETURN NULL;
         END IF;
@@ -370,10 +437,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION product_final(state numeric)
+RETURNS numeric AS
+$$
+BEGIN
+    RETURN state;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
 CREATE OR REPLACE AGGREGATE product(numeric) (
     STYPE     numeric,
     SFUNC     product_trans,
-    FINALFUNC   COALESCE,
+    FINALFUNC product_final,
     INITCOND  '1'
 );
 
