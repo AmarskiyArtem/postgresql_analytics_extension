@@ -1,0 +1,3 @@
+comment = 'Analytic extension for PostgreSQL'
+default_version = '1.0'
+relocatable = true
