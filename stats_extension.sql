@@ -115,28 +115,28 @@ CREATE OR REPLACE AGGREGATE skewness_pop(double precision) (
     STYPE    double precision[],
     SFUNC    array_append,
     FINALFUNC     _skewness_pop_array,
-    INITCOND      '{}' :: double precision[]
+    INITCOND      '{}'
 );
 
 CREATE OR REPLACE AGGREGATE skewness_samp(double precision) (
     STYPE    double precision[],
     SFUNC    array_append,
     FINALFUNC     _skewness_samp_array,
-    INITCOND      '{}' :: double precision[]
+    INITCOND      '{}'
 );
 
 CREATE OR REPLACE AGGREGATE kurtosis_pop(double precision) (
     STYPE    double precision[],
     SFUNC    array_append,
     FINALFUNC     _kurtosis_pop_array,
-    INITCOND      '{}' :: double precision[]
+    INITCOND      '{}'
 );
 
 CREATE OR REPLACE AGGREGATE kurtosis_samp(double precision) (
     STYPE    double precision[],
     SFUNC    array_append,
     FINALFUNC     _kurtosis_samp_array,
-    INITCOND      '{}' :: double precision[]
+    INITCOND      '{}'
 );
 
 
@@ -153,8 +153,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE AGGREGATE median(anyelement) (
     STYPE      anyarray,
     SFUNC      array_append,
-    FINALFUNC  median_final,
-    INITCOND   '{}'::anyarray
+    FINALFUNC  median_final
 );
 
 
@@ -184,8 +183,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE AGGREGATE mode(anyelement) (
     STYPE      anyarray,
     SFUNC      array_append,
-    FINALFUNC  mode_final,
-    INITCOND   '{}'::anyarray
+    FINALFUNC  mode_final
 );
 
 
@@ -216,8 +214,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE AGGREGATE entropy(anyelement) (
     STYPE      anyarray,
     SFUNC      array_append,
-    FINALFUNC  entropy_final,
-    INITCOND   '{}'::anyarray
+    FINALFUNC  entropy_final
 );
 
 
@@ -388,8 +385,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE AGGREGATE contingency(val1 anyelement, val2 anyelement) (
     STYPE      jsonb,
     SFUNC      contingency_trans,
-    FINALFUNC  contingency_final,
-    INITCOND   '{"total":0,"rows":{},"cols":{},"cells":{}}'::jsonb
+    FINALFUNC  contingency_final
 );
 
 
@@ -421,7 +417,7 @@ CREATE OR REPLACE AGGREGATE geometric_mean(double precision) (
     STYPE      double precision[],
     SFUNC      array_append,
     FINALFUNC  geometric_mean_final,
-    INITCOND   '{}'::double precision[]
+    INITCOND   '{}'
 );
 
 
