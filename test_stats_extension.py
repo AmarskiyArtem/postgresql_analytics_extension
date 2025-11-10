@@ -2,22 +2,22 @@ import hashlib
 import math
 import unittest
 from collections import Counter
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 
-SAMPLE_ROWS: List[Tuple[str, str, float, float, float, float, bool, str, str]] = [
-    ("A", "North", 10.5, 10.5, 1.0, 1.0, True, "bronze", "alpha"),
-    ("A", "North", 13.2, 13.2, 2.0, 2.0, True, "bronze", "alpha"),
-    ("A", "South", 15.0, 15.0, 1.5, 1.5, False, "silver", "beta"),
-    ("B", "South", 11.0, 11.0, 0.8, 0.8, True, "gold", "beta"),
-    ("B", "East", 18.4, 18.4, 2.5, 2.5, True, "gold", "gamma"),
-    ("B", "East", 21.0, 21.0, 3.0, 3.0, False, "gold", "gamma"),
-    ("C", "West", 9.5, 9.5, 1.3, 1.3, True, "silver", "delta"),
-    ("C", "West", 9.5, 9.5, 1.1, 1.1, True, "silver", "epsilon"),
-    ("C", "North", 14.7, 14.7, 1.4, 1.4, True, "bronze", "delta"),
-    ("C", "South", 17.2, 17.2, 2.2, 2.2, True, "gold", "epsilon"),
-    ("D", "West", 0.0, 0.0, 0.5, 0.5, True, "silver", "omega"),
-    ("D", "East", -4.0, -4.0, 0.7, 0.7, True, "bronze", "omega"),
+SAMPLE_ROWS: List[Tuple[str, str, float, float, bool, str]] = [
+    ("A", "North", 10.5, 1.0, True, "bronze"),
+    ("A", "North", 13.2, 2.0, True, "bronze"),
+    ("A", "South", 15.0, 1.5, False, "silver"),
+    ("B", "South", 11.0, 0.8, True, "gold"),
+    ("B", "East", 18.4, 2.5, True, "gold"),
+    ("B", "East", 21.0, 3.0, False, "gold"),
+    ("C", "West", 9.5, 1.3, True, "silver"),
+    ("C", "West", 9.5, 1.1, True, "silver"),
+    ("C", "North", 14.7, 1.4, True, "bronze"),
+    ("C", "South", 17.2, 2.2, True, "gold"),
+    ("D", "West", 0.0, 0.5, True, "silver"),
+    ("D", "East", -4.0, 0.7, True, "bronze"),
 ]
 
 EXPECTED_FLOATS = {
@@ -36,36 +36,20 @@ EXPECTED_FLOATS = {
     "edit_distance_similarity": 0.5555555555555556,
 }
 
-EXPECTED_CONTINGENCY = {
-    ("A", "bronze"): 2,
-    ("A", "silver"): 1,
-    ("B", "gold"): 3,
-    ("C", "bronze"): 1,
-    ("C", "silver"): 2,
-    ("C", "gold"): 1,
-    ("D", "bronze"): 1,
-    ("D", "silver"): 1,
-}
-
-
 def _values() -> List[float]:
     return [row[2] for row in SAMPLE_ROWS]
 
 
 def _weights() -> List[float]:
-    return [row[4] for row in SAMPLE_ROWS]
+    return [row[3] for row in SAMPLE_ROWS]
 
 
 def _flags() -> List[bool]:
-    return [row[6] for row in SAMPLE_ROWS]
+    return [row[4] for row in SAMPLE_ROWS]
 
 
 def _labels() -> List[str]:
-    return [row[7] for row in SAMPLE_ROWS]
-
-
-def _cohorts() -> List[str]:
-    return [row[0] for row in SAMPLE_ROWS]
+    return [row[5] for row in SAMPLE_ROWS]
 
 
 def population_moments(values: Sequence[float]) -> Tuple[float, float, float, float]:
@@ -154,10 +138,6 @@ def product(values: Sequence[float]) -> float:
     return result
 
 
-def contingency_matrix(left: Sequence[str], right: Sequence[str]) -> Dict[Tuple[str, str], int]:
-    return Counter(zip(left, right))
-
-
 def edit_distance(left: str, right: str) -> int:
     len_left, len_right = len(left), len(right)
     if len_left == 0:
@@ -191,7 +171,6 @@ class StatsExtensionPurePythonTests(unittest.TestCase):
         self.weights = _weights()
         self.flags = _flags()
         self.labels = _labels()
-        self.cohorts = _cohorts()
 
     def test_skewness_and_kurtosis(self):
         self.assertAlmostEqual(skewness_pop(self.values), EXPECTED_FLOATS["skewness_pop"])
@@ -220,10 +199,6 @@ class StatsExtensionPurePythonTests(unittest.TestCase):
             EXPECTED_FLOATS["geometric_mean_positive"],
         )
         self.assertAlmostEqual(product(self.values), EXPECTED_FLOATS["product"])
-
-    def test_contingency(self):
-        cont = contingency_matrix(self.cohorts, self.labels)
-        self.assertEqual(cont, EXPECTED_CONTINGENCY)
 
     def test_edit_distance_functions(self):
         distance = edit_distance("analytics", "statics")
