@@ -1119,7 +1119,10 @@ BEGIN
     END IF;
 
     FOREACH element IN ARRAY elements LOOP
-        result := ((result * 31) # pg_catalog.hashtextextended(COALESCE(element, '__NULL__'), 0));
+        result := pg_catalog.hashtextextended(
+            COALESCE(element, '__NULL__'),
+            result
+        );
     END LOOP;
 
     RETURN result;
