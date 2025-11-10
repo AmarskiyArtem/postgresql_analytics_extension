@@ -75,7 +75,7 @@ SELECT geometric_mean(metric_value) FILTER (WHERE metric_value > 0) AS geometric
 FROM metric_samples;
 
 -- Product aggregate
-SELECT product(metric_value) AS product_all_values
+SELECT product(metric_value) FILTER (WHERE metric_value <> 0) AS product_nonzero_values
 FROM metric_samples;
 
 -- Scalar helpers

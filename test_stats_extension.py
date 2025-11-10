@@ -31,7 +31,7 @@ EXPECTED_FLOATS = {
     "avg_weighted": 14.201111111111109,
     "avg_if": 10.0,
     "geometric_mean_positive": 13.503853832517134,
-    "product": 0.0,
+    "product": -806561106319.5839,
     "edit_distance": 4,
     "edit_distance_similarity": 0.5555555555555556,
 }
@@ -198,7 +198,8 @@ class StatsExtensionPurePythonTests(unittest.TestCase):
             geometric_mean_positive(self.values),
             EXPECTED_FLOATS["geometric_mean_positive"],
         )
-        self.assertAlmostEqual(product(self.values), EXPECTED_FLOATS["product"])
+        nonzero_values = [value for value in self.values if value != 0]
+        self.assertAlmostEqual(product(nonzero_values), EXPECTED_FLOATS["product"])
 
     def test_edit_distance_functions(self):
         distance = edit_distance("analytics", "statics")
